@@ -13,11 +13,11 @@
     (are [e v1 v2] (= e (matrix-factorization.core/dot v1 v2))
          11 [1 2] [3 4])))
 
-(deftest update-matrix-in-test
-  (testing "matrix-factorization.core/update-matrix-in"
-    (are [x y] (= x y)
-         (incanter.core/matrix [[1 0] [0 0]])
-         (update-matrix-in (incanter.core/matrix [[0 0] [0 0]]) [0 0] inc)
-         (incanter.core/matrix [[0 0] [0 2]])
-         (update-matrix-in (incanter.core/matrix [[0 0] [0 0]]) [1 1] + 2)
-         )))
+;(deftest update-matrix-in-test
+;  (testing "matrix-factorization.core/update-matrix-in"
+;    (are [x y] (= x y)
+;         (incanter.core/matrix [[1 0] [0 0]])
+;         (update-matrix-in (incanter.core/matrix [[0 0] [0 0]]) [0 0] inc)
+;         (incanter.core/matrix [[0 0] [0 2]])
+;         (update-matrix-in (incanter.core/matrix [[0 0] [0 0]]) [1 1] + 2)
+;         )))
