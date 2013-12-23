@@ -14,19 +14,26 @@
   (for [i  (range  (count R))
         j  (range  (count (first R)))] [i j]))
 
-(defn get-error
-  ([R P Q beta] (+ (* (/ beta 2.0) (+ (norm P) (norm Q))) (get-error R P Q (make-matrix-index-combination R) 0.0)))
-  ([R P Q combination error]
+(def make-matrix-index-combination-memo
+  (memoize make-matrix-index-combination))
+
+(defn get-error [R P Q beta]
+  (letfn [(iter [combination error]
     (if combination
       (let [[i j] (first combination)
             r ($ i j R)]
         (if (zero? r)
-          (recur R P Q (next combination) error)
-          (recur R P Q (next combination) (+ error (incanter.core/sq (get-rating-error r ($ i P) ($ j Q)))))))
-      error)))
+          (recur (next combination) error)
+          (recur (next combination) (+ error (incanter.core/sq (get-rating-error r ($ i P) ($ j Q)))))))
+      error))]
+    (+ (iter (make-matrix-index-combination-memo R) 0.0)
+      (* (/ beta 2.0)
+         (+ (norm P) (norm Q))
+;         (+ (incanter.core/sq (norm P)) (incanter.core/sq (norm Q)))
+         ))))
 
 (defn update-matrix-in [m ks f & args]
-  (incanter.core/matrix (update-in (incanter.core/to-vect m) ks #(apply f % args))))
+  (incanter.core/matrix (update-in (incanter.core/to-list m) ks #(apply f % args))))
 
 (defn update-matrices [P Q K i j alpha err]
   (letfn [(iter [P Q k]
@@ -37,30 +44,29 @@
               [P Q]))]
     (iter P Q 0)))
 
-(defn do-step
-  ([R P Q K alpha beta]
-    (do-step R P Q K alpha beta (make-matrix-index-combination R)))
-  ([R P Q K alpha beta combination]
-    (if combination
-      (let [[i j] (first combination)
-            r ($ i j R)]
-         (if (zero? r)
-           (recur R P Q K alpha beta (next combination))
-           (let [err (get-rating-error r ($ i P) ($ j Q))
-                 [new-P new-Q] (update-matrices P Q K i j alpha err)]
-                 (recur R new-P new-Q K alpha beta (next combination)))))
-     [P Q])))
+(defn do-step [R P Q K alpha beta]
+  (letfn [(iter [P Q combination]
+            (if combination
+              (let [[i j] (first combination)
+                    r ($ i j R)]
+                (if (zero? r)
+                  (recur P Q (next combination))
+                  (let [[new-P new-Q] (update-matrices P Q K i j alpha (get-rating-error r ($ i P) ($ j Q)))]
+                    (recur new-P new-Q (next combination)))))
+              [P Q]))]
+    (iter P Q (make-matrix-index-combination-memo R))))
 
 
-(defn matrix-factorization-step
-  ([R P Q K steps alpha beta threshold]
-    (if steps
-      (let [[new-P new-Q] (do-step R P Q K alpha beta)
-            error (get-error R new-P new-Q beta) ]
-        (if (< error threshold)
-          [new-P new-Q]
-          (recur R new-P new-Q K (next steps) alpha beta threshold)))
-    [P Q])))
+(defn matrix-factorization-step [R P Q K step alpha beta threshold]
+  (letfn [(iter [P Q s]
+            (if (< s step)
+              (let [[new-P new-Q] (do-step R P Q K alpha beta)]
+                (if (< (get-error R new-P new-Q beta) threshold)
+                  [new-P new-Q]
+                  (recur new-P new-Q (inc s))))
+              [P Q]))]
+    (iter P Q 0))
+  )
 
 (defn random-matrix [x y]
   (incanter.core/matrix (take (* x y) (repeatedly rand)) y))
@@ -70,7 +76,7 @@
                              (random-matrix K (count R))
                              (random-matrix K (count (first R)))
                              K
-                             (range step)
+                             step
                              alpha
                              beta
                              threshold))
